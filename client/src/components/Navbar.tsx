@@ -1,17 +1,18 @@
 import React from 'react'
 import { Box, Flex, Link } from '@chakra-ui/layout'
 import NextLink from "next/link";
-import { useMeQuery } from '../generated/graphql';
+import { useLogoutMutation, useMeQuery } from '../generated/graphql';
 import { Button } from '@chakra-ui/button';
 
 interface NavBarProps { }
 
 const NavBar: React.FC<NavBarProps> = () => {
-    const [{ data , fetching}] = useMeQuery()
+    const [{ data, fetching }] = useMeQuery()
+    const [{ fetching: logoutFetching }, logout] = useLogoutMutation()
 
     let body = null
 
-    if (fetching) { 
+    if (fetching) {
         // user not logged in
     } else if (!data?.me) {
         body = (
@@ -24,11 +25,11 @@ const NavBar: React.FC<NavBarProps> = () => {
                 </NextLink>
             </>
         )
-    } else { 
+    } else {
         body = (
             <Flex>
                 <Box mr={2}>{data.me.username}</Box>
-                <Link>Logout</Link>
+                <Button colorScheme='link' isLoading={logoutFetching} onClick={() => logout()}>Logout</Button>
             </Flex>
         )
     }

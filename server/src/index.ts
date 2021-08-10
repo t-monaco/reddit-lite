@@ -7,7 +7,7 @@ import redis from 'redis';
 import session from 'express-session';
 import connectRedis from 'connect-redis';
 import { MyContext } from './types';
-import { __prod__ } from './constants';
+import { COOKIE_NAME, __prod__ } from './constants';
 import mikroConfig from './mikro-orm.config';
 import { HelloResolver } from './resolvers/hello';
 import { PostResolver } from './resolvers/post';
@@ -33,7 +33,7 @@ const main = async () => {
     // TODO Set new secret, this is just fot development
     app.use(
         session({
-            name: 'qid',
+            name: COOKIE_NAME,
             store: new RedisStore({
                 client: redisClient,
                 // disableTouch: true,
