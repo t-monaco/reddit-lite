@@ -12,6 +12,7 @@ import mikroConfig from './mikro-orm.config';
 import { HelloResolver } from './resolvers/hello';
 import { PostResolver } from './resolvers/post';
 import { UserResolver } from './resolvers/user';
+import cors from 'cors';
 
 const main = async () => {
     const orm = await MikroORM.init(mikroConfig);
@@ -21,6 +22,13 @@ const main = async () => {
 
     const RedisStore = connectRedis(session);
     const redisClient = redis.createClient();
+
+    app.use(
+        cors({
+            origin: 'http://localhost:3000',
+            credentials: true,
+        })
+    );
 
     // TODO Set new secret, this is just fot development
     app.use(
@@ -51,7 +59,10 @@ const main = async () => {
     });
 
     await apolloServer.start();
-    apolloServer.applyMiddleware({ app });
+    apolloServer.applyMiddleware({
+        app,
+        cors: false,
+    });
 
     app.listen(4000, () => {
         console.log('Listening on localhost:4000');
