@@ -13,9 +13,11 @@ import { HelloResolver } from './resolvers/hello';
 import { PostResolver } from './resolvers/post';
 import { UserResolver } from './resolvers/user';
 import cors from 'cors';
+// import { User } from './entities/User';
 
 const main = async () => {
     const orm = await MikroORM.init(mikroConfig);
+    // await orm.em.nativeDelete(User, {})
     await orm.getMigrator().up();
 
     const app = express();

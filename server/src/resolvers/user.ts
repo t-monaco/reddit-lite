@@ -1,10 +1,9 @@
+import { validateRegister } from './../utils/validateRegister';
 import {
     Ctx,
     Arg,
     Resolver,
     Query,
-    // Int,
-    InputType,
     Mutation,
     Field,
     ObjectType,
@@ -13,14 +12,7 @@ import argon2 from 'argon2';
 import { User } from '../entities/User';
 import { MyContext } from '../types';
 import { COOKIE_NAME } from '../constants';
-
-@InputType()
-class UsernamePasswordInput {
-    @Field()
-    username: string;
-    @Field()
-    password: string;
-}
+import { RegisterInput } from '../utils/RegisterInput';
 
 @ObjectType()
 class FieldError {
@@ -52,48 +44,17 @@ export class UserResolver {
 
     @Mutation(() => UserResponse)
     async register(
-        @Arg('options') options: UsernamePasswordInput,
+        @Arg('options') options: RegisterInput,
         @Ctx() { em, req }: MyContext
     ): Promise<UserResponse> {
-        if (options.username.length <= 2) {
-            return {
-                errors: [
-                    {
-                        field: 'username',
-                        message: 'Username lenght must be greater that 2.',
-                    },
-                ],
-            };
-        }
-
-        if (options.username.length <= 2) {
-            return {
-                errors: [
-                    {
-                        field: 'password',
-                        message: 'password lenght must be greater that 2.',
-                    },
-                ],
-            };
-        }
-
-        const existingUser = await em.findOne(User, {
-            username: options.username,
-        });
-
-        if (existingUser) {
-            return {
-                errors: [
-                    {
-                        field: 'username',
-                        message: 'Username already taken.',
-                    },
-                ],
-            };
-        }
+        const errors = await validateRegister(em, options);
+        if (errors) {
+            return {errors}
+        };
 
         const hashedPassword = await argon2.hash(options.password);
         const user = em.create(User, {
+            email: options.email,
             username: options.username,
             password: hashedPassword,
         });
@@ -111,25 +72,33 @@ export class UserResolver {
 
     @Mutation(() => UserResponse)
     async login(
-        @Arg('options') options: UsernamePasswordInput,
+        @Arg('usernameOrEmail') usernameOrEmail: string,
+        @Arg('password') password: string,
         @Ctx() { em, req }: MyContext
     ): Promise<UserResponse> {
-        const user = await em.findOne(User, {
-            username: options.username,
-        });
+        const user = await em.findOne(
+            User,
+            usernameOrEmail.includes('@')
+                ? {
+                      email: usernameOrEmail,
+                  }
+                : {
+                      username: usernameOrEmail,
+                  }
+        );
 
         if (!user) {
             return {
                 errors: [
                     {
-                        field: 'username',
+                        field: 'usernameOrEmail',
                         message: 'Invalid credentials',
                     },
                 ],
             };
         }
 
-        const verify = await argon2.verify(user.password, options.password);
+        const verify = await argon2.verify(user.password, password);
 
         if (!verify) {
             return {
