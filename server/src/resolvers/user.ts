@@ -1,18 +1,20 @@
-import { validateRegister } from './../utils/validateRegister';
-import {
-    Ctx,
-    Arg,
-    Resolver,
-    Query,
-    Mutation,
-    Field,
-    ObjectType,
-} from 'type-graphql';
 import argon2 from 'argon2';
+import {
+    Arg,
+    Ctx,
+    Field,
+    Mutation,
+    ObjectType,
+    Query,
+    Resolver,
+} from 'type-graphql';
+import { v4 } from 'uuid';
+import { COOKIE_NAME, FORGOT_PASSWORD_PREFIX } from '../constants';
 import { User } from '../entities/User';
 import { MyContext } from '../types';
-import { COOKIE_NAME } from '../constants';
 import { RegisterInput } from '../utils/RegisterInput';
+import { sendEail } from './../utils/sendEmail';
+import { validateRegister } from './../utils/validateRegister';
 
 @ObjectType()
 class FieldError {
@@ -49,8 +51,8 @@ export class UserResolver {
     ): Promise<UserResponse> {
         const errors = await validateRegister(em, options);
         if (errors) {
-            return {errors}
-        };
+            return { errors };
+        }
 
         const hashedPassword = await argon2.hash(options.password);
         const user = em.create(User, {
@@ -130,5 +132,89 @@ export class UserResolver {
                 resolve(true);
             })
         );
+    }
+
+    @Mutation(() => Boolean)
+    async forgotPassword(
+        @Arg('email') email: string,
+        @Ctx() { em, redis }: MyContext
+    ) {
+        const user = await em.findOne(User, { email });
+        if (!user) {
+            return true; // security purposes
+        }
+
+        const token: string = v4();
+
+        await redis.set(
+            FORGOT_PASSWORD_PREFIX + token,
+            user.id,
+            'ex',
+            1000 * 60 * 60
+        );
+
+        sendEail(
+            email,
+            `<a href="http://localhost:3000/chage-password/${token}">Reset password</a>`
+        );
+        return true;
+    }
+
+    @Mutation(() => UserResponse)
+    async changePassword(
+        @Arg('token') token: string,
+        @Arg('newPassword') newPassword: string,
+        @Ctx() { em, redis, req}: MyContext
+    ): Promise<UserResponse> {
+        if (newPassword.length <= 2) {
+            return {
+                errors: [
+                    {
+                        field: 'newPassword',
+                        message: 'password lenght must be greater that 2.',
+                    },
+                ],
+            };
+        }
+
+        const key = FORGOT_PASSWORD_PREFIX + token;
+        const userId = await redis.get(key);
+
+        if (!userId) {
+            return {
+                errors: [
+                    {
+                        field: 'token',
+                        message: 'invalid token',
+                    },
+                ],
+            };
+        }
+
+        const user = await em.findOne(User, { id: parseInt(userId) });
+
+        if (!user) {
+            return {
+                errors: [
+                    {
+                        field: 'token',
+                        message: 'user no longer exist',
+                    },
+                ],
+            };
+        }
+
+        user.password = await argon2.hash(newPassword);
+        try {
+            await em.persistAndFlush(user);
+        } catch (error) {
+            console.error(error.message);
+        }
+
+        redis.del(key)
+        // Login user after change password
+        req.session.userId = user.id
+
+        return {user}
     }
 }
