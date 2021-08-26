@@ -10,7 +10,7 @@ import { useChangePasswordMutation } from '../../generated/graphql';
 import { createUrqlClient } from '../../utils/createUrqlClient';
 import { toErrorMap } from '../../utils/toErrorMap';
 
-const ChangePassword: NextPage<{ token: string }> = ({ token }) => {
+const ChangePassword: NextPage<{ token: string }> = () => {
     const router = useRouter()
     const [tokenError, setTokenError] = useState('')
     const [, changePassword] = useChangePasswordMutation()
@@ -22,7 +22,7 @@ const ChangePassword: NextPage<{ token: string }> = ({ token }) => {
                 onSubmit={async (values, { setErrors }) => {
                     const response = await changePassword({
                         newPassword: values.newPassword,
-                        token
+                        token: typeof router.query.token[0] === 'string' ? router.query.token[0] : ''
                     })
 
                     console.log(response.data?.changePassword.errors)
@@ -50,12 +50,6 @@ const ChangePassword: NextPage<{ token: string }> = ({ token }) => {
             </Formik>
         </Wrapper>
     )
-}
-
-ChangePassword.getInitialProps = ({ query }) => {
-    return {
-        token: query.token as string,
-    }
 }
 
 // TODO: Fix this, probably I'll replace URQL with APOLLO that is why is ignored
