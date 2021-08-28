@@ -1,5 +1,4 @@
-import { getConnection, getRepository } from 'typeorm';
-import { MyContext } from '../types';
+import { Updoot } from '../entities/Updoot';
 import {
     Arg,
     Ctx,
@@ -14,8 +13,10 @@ import {
     Root,
     UseMiddleware,
 } from 'type-graphql';
+import { getConnection } from 'typeorm';
 import { Post } from '../entities/Post';
 import { isAuth } from '../middleware/isAuth';
+import { MyContext } from '../types';
 
 @InputType()
 class PostInput {
@@ -58,7 +59,8 @@ export class PostResolver {
             replacements.push(cursor);
         }
 
-        const posts = await getConnection().query(`
+        const posts = await getConnection().query(
+            `
             select p.*,
             json_build_object(
                 'id', u.id,
@@ -67,12 +69,12 @@ export class PostResolver {
             ) creator
             from post p
             inner join public.user u on u.id = p."creatorId"
-            ${cursor ? `where p."createdAt" <  $2`: ""}
+            ${cursor ? `where p."createdAt" <  $2` : ''}
             order by p."createdAt" DESC
             limit $1
-        `, replacements)
-
-        console.log(posts)
+        `,
+            replacements
+        );
 
         return {
             posts: posts.slice(0, realLimit),
@@ -116,6 +118,64 @@ export class PostResolver {
     @Mutation(() => Boolean)
     async deletePost(@Arg('id') id: number): Promise<boolean> {
         await Post.delete(id);
+        return true;
+    }
+
+    @Mutation(() => Boolean)
+    @UseMiddleware(isAuth)
+    async vote(
+        @Arg('postId', () => Int) postId: number,
+        @Arg('value', () => Int) value: number,
+        @Ctx() { req }: MyContext
+    ) {
+        const isUpdoot = value !== -1;
+        const realValue = isUpdoot ? 1 : -1;
+        const { userId } = req.session;
+
+        const updoot = await Updoot.findOne({ where: { postId, userId } });
+        console.log(updoot);
+
+        if (updoot && updoot.value !== realValue) {
+            await getConnection().transaction(async (tm) => {
+                await tm.query(
+                    `
+                    update updoot
+                    set value = $1
+                    where "postId" = $2 and "userId" = $3
+                `,
+                    [realValue, postId, userId]
+                );
+
+                await tm.query(
+                    `
+                    update post
+                    set points = points + $1
+                    where id = $2;
+                `,
+                    [2 * realValue, postId]
+                );
+            });
+        } else if (!updoot) {
+            //    never voted before
+            await getConnection().transaction(async (tm) => {
+                await tm.query(
+                    `
+                    insert into updoot("userId", "postId", value)
+                    values ($1, $2, $3);
+                `,
+                    [userId, postId, realValue]
+                );
+
+                await tm.query(
+                    `
+                    update post
+                    set points = points + $1
+                    where id = $2;
+                `,
+                    [realValue, postId]
+                );
+            });
+        }
         return true;
     }
 }

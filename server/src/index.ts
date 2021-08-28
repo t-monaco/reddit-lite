@@ -14,6 +14,7 @@ import { UserResolver } from './resolvers/user';
 import cors from 'cors';
 import { User } from './entities/User';
 import { Post } from './entities/Post';
+import { Updoot } from './entities/Updoot';
 import path from 'path';
 
 const main = async () => {
@@ -25,7 +26,7 @@ const main = async () => {
         logging: true,
         synchronize: true,
         migrations: [path.join(__dirname, './migrations/*')],
-        entities: [User, Post],
+        entities: [User, Post, Updoot],
     });
 
     await conn.runMigrations();

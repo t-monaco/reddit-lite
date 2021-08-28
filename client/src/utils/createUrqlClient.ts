@@ -134,7 +134,7 @@ export const createUrqlClient = (_ssrExchange: any) => ({
         dedupExchange,
         cacheExchange({
             keys: {
-                PaginatedPosts: null
+                PaginatedPosts: null,
             },
             resolvers: {
                 Query: {
@@ -143,6 +143,32 @@ export const createUrqlClient = (_ssrExchange: any) => ({
             },
             updates: {
                 Mutation: {
+                    vote: (_result, args, cache, info) => {
+                        const allFields = cache.inspectFields('Query');
+                        const fieldInfos = allFields.filter(
+                            (info) => info.fieldName === 'posts'
+                        );
+                        fieldInfos.forEach((fi) => {
+                            cache.invalidate(
+                                'Query',
+                                'posts',
+                                fi.arguments || {}
+                            );
+                        });
+                    },
+                    createPost: (_result, args, cache, info) => {
+                        const allFields = cache.inspectFields('Query');
+                        const fieldInfos = allFields.filter(
+                            (info) => info.fieldName === 'posts'
+                        );
+                        fieldInfos.forEach((fi) => {
+                            cache.invalidate(
+                                'Query',
+                                'posts',
+                                fi.arguments || {}
+                            );
+                        });
+                    },
                     logout: (_result, args, cache, info) => {
                         betterpdateQuery<LogoutMutation, MeQuery>(
                             cache,
