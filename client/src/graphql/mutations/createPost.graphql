@@ -6,6 +6,6 @@ mutation CreatePost($input: PostInput!) {
         points
         creatorId
         createdAt
-        u pdatedAt
+        updatedAt
     }
 }
