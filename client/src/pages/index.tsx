@@ -1,13 +1,12 @@
+import { DeleteIcon } from "@chakra-ui/icons"
+import { Box, Button, Flex, Heading, IconButton, Link, Stack, Text } from "@chakra-ui/react"
 import { withUrqlClient } from "next-urql"
+import NextLink from 'next/link'
 import React, { useState } from "react"
 import Layout from "../components/Layout"
-import NavBar from "../components/Navbar"
-import { usePostsQuery } from "../generated/graphql"
-import { createUrqlClient } from "../utils/createUrqlClient"
-import NextLink from 'next/link'
-import { Box, Button, Flex, Heading, Icon, IconButton, Link, Stack, Text } from "@chakra-ui/react"
-import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, ChevronUpIcon } from "@chakra-ui/icons"
 import UpdootSection from "../components/UpdootSection"
+import { useDeletePostMutation, usePostsQuery } from "../generated/graphql"
+import { createUrqlClient } from "../utils/createUrqlClient"
 
 const Index = () => {
     const [variables, setVariables] = useState({ limit: 15, cursor: null as null | string })
@@ -15,29 +14,42 @@ const Index = () => {
         variables
     })
 
+    const [, deletePost] = useDeletePostMutation()
+
     if (!data && !fetching) {
         return 'Sorry, nothing to show...'
     }
 
     return (
         <Layout>
-            <Flex mb={6}>
-                <Heading>My Reddit</Heading>
-                <NextLink href='create-post'>
-                    <Link ml='auto'>Create Post</Link>
-                </NextLink>
-            </Flex>
             {!data && fetching ? (
                 <div>Loading...</div>
             ) : (
                 <Stack spacing={8}>
-                    {data.posts.posts.map(p => (
+                    {data.posts.posts.map(p => !p ? null :  (
                         <Flex key={p.id} p={5} shadow="md" borderWidth="1px">
                             <UpdootSection post={p} />
-                            <Box>
-                                <Heading fontSize="xl">{p.title}</Heading>
+                            <Box flex={1} position='relative'>
+                                <NextLink href='/post/[id]' as={`/post/${p.id}`}>
+                                    <Link>
+                                        <Heading fontSize="xl">{p.title}</Heading>
+                                    </Link>
+                                </NextLink>
                                 <Text>posted by {p.creator.username}</Text>
-                                <Text mt={4}>{p.textSnippet}</Text>
+                                <Flex>
+                                    <Text flex={1} mt={4} pr='50px'>{p.textSnippet}</Text>
+                                    <IconButton
+                                        position='absolute'
+                                        right={0}
+                                        bottom={0}
+                                        onClick={() => {
+                                            deletePost({ id: p.id })
+                                        }}
+                                        colorScheme='red'
+                                        aria-label='updoot'
+                                        icon={<DeleteIcon />}
+                                    />
+                                </Flex>
                             </Box>
                         </Flex>
                     ))}
@@ -46,6 +58,7 @@ const Index = () => {
             {data && data.posts.hasMore &&
                 (<Flex>
                     <Button onClick={() => {
+                        console.log(data.posts.posts[data.posts.posts.length - 1].createdAt)
                         setVariables({
                             limit: variables.limit,
                             cursor: data.posts.posts[data.posts.posts.length - 1].createdAt
